@@ -43,7 +43,6 @@ import {
   DataRecordValue,
   DTTM_ALIAS,
   ensureIsArray,
-  GenericDataType,
   getSelectedText,
   getTimeFormatterForGranularity,
   BinaryQueryObjectFilterClause,
@@ -54,6 +53,7 @@ import {
   useTheme,
   SupersetTheme,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/api/core';
 import {
   Input,
   Space,
@@ -83,12 +83,12 @@ import DataTable, {
   SelectPageSizeRendererProps,
   SizeOption,
 } from './DataTable';
-
 import Styles from './Styles';
 import { formatColumnValue } from './utils/formatValue';
 import { PAGE_SIZE_OPTIONS, SERVER_PAGE_SIZE_OPTIONS } from './consts';
 import { updateTableOwnState } from './DataTable/utils/externalAPIs';
 import getScrollBarSize from './DataTable/utils/getScrollBarSize';
+import DateWithFormatter from './utils/DateWithFormatter';
 
 type ValueRange = [number, number];
 
@@ -169,12 +169,21 @@ function cellOffset({
 function cellBackground({
   value,
   colorPositiveNegative = false,
+  theme,
 }: {
   value: number;
   colorPositiveNegative: boolean;
+  theme: SupersetTheme;
 }) {
-  const r = colorPositiveNegative && value < 0 ? 150 : 0;
-  return `rgba(${r},0,0,0.2)`;
+  if (!colorPositiveNegative) {
+    return `${theme.colorFillSecondary}50`;
+  }
+
+  if (value < 0) {
+    return `${theme.colorError}50`;
+  }
+
+  return `${theme.colorSuccess}50`;
 }
 
 function SortIcon<D extends object>({ column }: { column: ColumnInstance<D> }) {
@@ -198,7 +207,7 @@ function SearchInput({
       {t('Search')}
       <Input
         aria-label={t('Search %s records', count)}
-        placeholder={tn('search.num_records', count)}
+        placeholder={tn('%s record', '%s records...', count, count)}
         value={value}
         onChange={onChange}
         onBlur={onBlur}
@@ -880,6 +889,7 @@ export default function TableChart<D extends DataRecord = DataRecord>(
                 background-color: ${cellBackground({
                   value: value as number,
                   colorPositiveNegative,
+                  theme,
                 })};
               `}
           `;
@@ -934,7 +944,10 @@ export default function TableChart<D extends DataRecord = DataRecord>(
             },
             className: [
               className,
-              value == null ? 'dt-is-null' : '',
+              value == null ||
+              (value instanceof DateWithFormatter && value.input == null)
+                ? 'dt-is-null'
+                : '',
               isActiveFilterValue(key, value) ? ' dt-is-active-filter' : '',
             ].join(' '),
             tabIndex: 0,
@@ -1085,6 +1098,7 @@ export default function TableChart<D extends DataRecord = DataRecord>(
       totals,
       columnColorFormatters,
       columnOrderToggle,
+      theme,
     ],
   );
 

@@ -20,15 +20,14 @@ import {
   extractTimegrain,
   getNumberFormatter,
   NumberFormats,
-  GenericDataType,
   getMetricLabel,
   getXAxisLabel,
   Metric,
   getValueFormatter,
-  supersetTheme,
   t,
   tooltipHtml,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/api/core';
 import { EChartsCoreOption, graphic } from 'echarts/core';
 import { aggregationChoices } from '@superset-ui/chart-controls';
 import {
@@ -281,7 +280,7 @@ export default function transformProps(
                 },
                 {
                   offset: 1,
-                  color: supersetTheme.colorBgContainer,
+                  color: 'transparent',
                 },
               ]),
             },

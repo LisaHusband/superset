@@ -168,6 +168,9 @@ const StyledToolbar = styled.div`
 
 const StyledSidebar = styled.div`
   padding: ${({ theme }) => theme.sizeUnit * 2.5}px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 `;
 
 const StyledSqlEditor = styled.div`
@@ -285,8 +288,6 @@ const SqlEditor: FC<Props> = ({
   const sqlEditorRef = useRef<HTMLDivElement>(null);
 
   const SqlFormExtension = extensionsRegistry.get('sqleditor.extension.form');
-
-  const isTempId = (value: unknown): boolean => Number.isNaN(Number(value));
 
   const startQuery = useCallback(
     (ctasArg = false, ctas_method = CtasEnum.Table) => {
@@ -979,9 +980,7 @@ const SqlEditor: FC<Props> = ({
               {({ height }) =>
                 isActive && (
                   <AceEditorWrapper
-                    autocomplete={
-                      autocompleteEnabled && !isTempId(queryEditor.id)
-                    }
+                    autocomplete={autocompleteEnabled}
                     onBlur={onSqlChanged}
                     onChange={onSqlChanged}
                     queryEditorId={queryEditor.id}

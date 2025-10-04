@@ -6,6 +6,8 @@ alembic==1.15.2
     # via flask-migrate
 amqp==5.3.1
     # via kombu
+annotated-types==0.7.0
+    # via pydantic
 apispec==6.6.1
     # via
     #   -r requirements/base.in
@@ -13,9 +15,7 @@ apispec==6.6.1
 apsw==3.50.1.0
     # via shillelagh
 async-timeout==4.0.3
-    # via
-    #   -r requirements/base.in
-    #   redis
+    # via -r requirements/base.in
 attrs==25.3.0
     # via
     #   cattrs
@@ -116,11 +116,11 @@ flask==2.3.3
     #   flask-session
     #   flask-sqlalchemy
     #   flask-wtf
-flask-appbuilder==4.8.1
+flask-appbuilder==5.0.0
     # via
     #   apache-superset (pyproject.toml)
     #   apache-superset-core
-flask-babel==2.0.0
+flask-babel==3.1.0
     # via flask-appbuilder
 flask-caching==2.3.1
     # via apache-superset (pyproject.toml)
@@ -222,10 +222,13 @@ marshmallow==3.26.1
     #   apache-superset (pyproject.toml)
     #   flask-appbuilder
     #   marshmallow-sqlalchemy
+    #   marshmallow-union
 marshmallow-sqlalchemy==1.4.0
     # via
     #   -r requirements/base.in
     #   flask-appbuilder
+marshmallow-union==0.1.15
+    # via apache-superset (pyproject.toml)
 mdurl==0.1.2
     # via markdown-it-py
 msgpack==1.0.8
@@ -264,7 +267,7 @@ packaging==25.0
     #   limits
     #   marshmallow
     #   shillelagh
-pandas==2.0.3
+pandas==2.1.4
     # via apache-superset (pyproject.toml)
 paramiko==3.5.1
     # via
@@ -296,6 +299,10 @@ pyasn1-modules==0.4.2
     # via google-auth
 pycparser==2.22
     # via cffi
+pydantic==2.11.7
+    # via apache-superset (pyproject.toml)
+pydantic-core==2.33.2
+    # via pydantic
 pygments==2.19.1
     # via rich
 pyjwt==2.10.1
@@ -388,7 +395,7 @@ sqlalchemy-utils==0.38.3
     # via
     #   apache-superset (pyproject.toml)
     #   flask-appbuilder
-sqlglot==27.3.0
+sqlglot==27.15.2
     # via apache-superset (pyproject.toml)
 sshtunnel==0.4.0
     # via apache-superset (pyproject.toml)
@@ -405,13 +412,16 @@ typing-extensions==4.14.0
     #   apache-superset (pyproject.toml)
     #   alembic
     #   cattrs
-    #   exceptiongroup
     #   limits
+    #   pydantic
+    #   pydantic-core
     #   pyopenssl
     #   referencing
-    #   rich
     #   selenium
     #   shillelagh
+    #   typing-inspection
+typing-inspection==0.4.1
+    # via pydantic
 tzdata==2025.2
     # via
     #   kombu

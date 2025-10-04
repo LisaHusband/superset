@@ -73,6 +73,7 @@ ibm-db2.svg
 postgresql.svg
 snowflake.svg
 ydb.svg
+loading.svg
 
 # docs-related
 erd.puml
@@ -81,6 +82,7 @@ intro_header.txt
 
 # for LLMs
 llm-context.md
+AGENTS.md
 LLMS.md
 CLAUDE.md
 CURSOR.md

@@ -2,14 +2,14 @@
 #    uv pip compile requirements/development.in -c requirements/base-constraint.txt -o requirements/development.txt
 -e .
     # via -r requirements/development.in
--e ./superset-cli
-    # via
-    #   -r requirements/development.in
-    #   apache-superset
 -e ./superset-core
     # via
     #   apache-superset
-    #   apache-superset-cli
+    #   apache-superset-extensions-cli
+-e ./superset-extensions-cli
+    # via
+    #   -r requirements/development.in
+    #   apache-superset
 alembic==1.15.2
     # via
     #   -c requirements/base-constraint.txt
@@ -18,6 +18,10 @@ amqp==5.3.1
     # via
     #   -c requirements/base-constraint.txt
     #   kombu
+annotated-types==0.7.0
+    # via
+    #   -c requirements/base-constraint.txt
+    #   pydantic
 apispec==6.6.1
     # via
     #   -c requirements/base-constraint.txt
@@ -102,7 +106,7 @@ click==8.2.1
     # via
     #   -c requirements/base-constraint.txt
     #   apache-superset
-    #   apache-superset-cli
+    #   apache-superset-extensions-cli
     #   celery
     #   click-didyoumean
     #   click-option-group
@@ -177,8 +181,10 @@ dnspython==2.7.0
     #   email-validator
 docker==7.0.0
     # via apache-superset
-duckdb==1.3.2
-    # via duckdb-engine
+duckdb==0.10.3
+    # via
+    #   apache-superset
+    #   duckdb-engine
 duckdb-engine==0.17.0
     # via apache-superset
 email-validator==2.2.0
@@ -208,12 +214,12 @@ flask==2.3.3
     #   flask-sqlalchemy
     #   flask-testing
     #   flask-wtf
-flask-appbuilder==4.8.1
+flask-appbuilder==5.0.0
     # via
     #   -c requirements/base-constraint.txt
     #   apache-superset
     #   apache-superset-core
-flask-babel==2.0.0
+flask-babel==3.1.0
     # via
     #   -c requirements/base-constraint.txt
     #   flask-appbuilder
@@ -383,7 +389,7 @@ itsdangerous==2.2.0
 jinja2==3.1.6
     # via
     #   -c requirements/base-constraint.txt
-    #   apache-superset-cli
+    #   apache-superset-extensions-cli
     #   flask
     #   flask-babel
 jsonpath-ng==1.7.0
@@ -445,10 +451,15 @@ marshmallow==3.26.1
     #   apache-superset
     #   flask-appbuilder
     #   marshmallow-sqlalchemy
+    #   marshmallow-union
 marshmallow-sqlalchemy==1.4.0
     # via
     #   -c requirements/base-constraint.txt
     #   flask-appbuilder
+marshmallow-union==0.1.15
+    # via
+    #   -c requirements/base-constraint.txt
+    #   apache-superset
 matplotlib==3.9.0
     # via prophet
 mccabe==0.7.0
@@ -528,7 +539,7 @@ packaging==25.0
     #   pytest
     #   shillelagh
     #   sqlalchemy-bigquery
-pandas==2.0.3
+pandas==2.1.4
     # via
     #   -c requirements/base-constraint.txt
     #   apache-superset
@@ -628,6 +639,14 @@ pycparser==2.22
     # via
     #   -c requirements/base-constraint.txt
     #   cffi
+pydantic==2.11.7
+    # via
+    #   -c requirements/base-constraint.txt
+    #   apache-superset
+pydantic-core==2.33.2
+    # via
+    #   -c requirements/base-constraint.txt
+    #   pydantic
 pydata-google-auth==1.9.0
     # via pandas-gbq
 pydruid==0.6.9
@@ -670,17 +689,17 @@ pysocks==1.7.1
 pytest==7.4.4
     # via
     #   apache-superset
-    #   apache-superset-cli
+    #   apache-superset-extensions-cli
     #   pytest-cov
     #   pytest-mock
 pytest-cov==6.0.0
     # via
     #   apache-superset
-    #   apache-superset-cli
+    #   apache-superset-extensions-cli
 pytest-mock==3.10.0
     # via
     #   apache-superset
-    #   apache-superset-cli
+    #   apache-superset-extensions-cli
 python-dateutil==2.9.0.post0
     # via
     #   -c requirements/base-constraint.txt
@@ -777,7 +796,7 @@ selenium==4.32.0
     #   -c requirements/base-constraint.txt
     #   apache-superset
 semver==3.0.4
-    # via apache-superset-cli
+    # via apache-superset-extensions-cli
 setuptools==80.7.1
     # via
     #   nodeenv
@@ -831,7 +850,7 @@ sqlalchemy-utils==0.38.3
     #   -c requirements/base-constraint.txt
     #   apache-superset
     #   flask-appbuilder
-sqlglot==27.3.0
+sqlglot==27.15.2
     # via
     #   -c requirements/base-constraint.txt
     #   apache-superset
@@ -869,15 +888,19 @@ typing-extensions==4.14.0
     #   -c requirements/base-constraint.txt
     #   alembic
     #   apache-superset
-    #   astroid
     #   cattrs
-    #   exceptiongroup
     #   limits
+    #   pydantic
+    #   pydantic-core
     #   pyopenssl
     #   referencing
-    #   rich
     #   selenium
     #   shillelagh
+    #   typing-inspection
+typing-inspection==0.4.1
+    # via
+    #   -c requirements/base-constraint.txt
+    #   pydantic
 tzdata==2025.2
     # via
     #   -c requirements/base-constraint.txt
@@ -908,7 +931,7 @@ watchdog==6.0.0
     # via
     #   -c requirements/base-constraint.txt
     #   apache-superset
-    #   apache-superset-cli
+    #   apache-superset-extensions-cli
 wcwidth==0.2.13
     # via
     #   -c requirements/base-constraint.txt
