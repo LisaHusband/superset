@@ -16,22 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  getExtensionsRegistry,
-  styled,
-  SupersetClient,
-  useTheme,
-  css,
-  t,
-} from '@superset-ui/core';
+import { t } from '@apache-superset/core';
+import { getExtensionsRegistry, SupersetClient } from '@superset-ui/core';
+import { styled, useTheme, css } from '@apache-superset/core/ui';
 import { FunctionComponent, useState, useMemo, useCallback, Key } from 'react';
 import { Link, useHistory } from 'react-router-dom';
 import rison from 'rison';
 import {
   createFetchRelated,
   createFetchDistinct,
+  createFetchOwners,
   createErrorHandler,
 } from 'src/views/CRUD/utils';
+import { OWNER_OPTION_FILTER_PROPS } from 'src/features/owners/OwnerSelectLabel';
 import { ColumnObject } from 'src/features/datasets/types';
 import { useListViewResource } from 'src/views/CRUD/hooks';
 import {
@@ -103,6 +100,9 @@ const Actions = styled.div`
         }
       }
       color: ${theme.colorTextDisabled};
+      &:hover {
+        cursor: not-allowed;
+      }
       .ant-menu-item:hover {
         cursor: default;
       }
@@ -275,12 +275,17 @@ const DatasetList: FunctionComponent<DatasetListProps> = ({
     setDatasetCurrentlyDuplicating(dataset);
   };
 
-  const handleBulkDatasetExport = (datasetsToExport: Dataset[]) => {
+  const handleBulkDatasetExport = async (datasetsToExport: Dataset[]) => {
     const ids = datasetsToExport.map(({ id }) => id);
-    handleResourceExport('dataset', ids, () => {
-      setPreparingExport(false);
-    });
     setPreparingExport(true);
+    try {
+      await handleResourceExport('dataset', ids, () => {
+        setPreparingExport(false);
+      });
+    } catch (error) {
+      setPreparingExport(false);
+      addDangerToast(t('There was an issue exporting the selected datasets'));
+    }
   };
 
   const columns = useMemo(
@@ -474,7 +479,7 @@ const DatasetList: FunctionComponent<DatasetListProps> = ({
                   <span
                     role="button"
                     tabIndex={0}
-                    className={allowEdit ? 'action-button' : 'disabled'}
+                    className={`action-button ${allowEdit ? '' : 'disabled'}`}
                     onClick={allowEdit ? handleEdit : undefined}
                   >
                     <Icons.EditOutlined iconSize="l" />
@@ -576,9 +581,8 @@ const DatasetList: FunctionComponent<DatasetListProps> = ({
         input: 'select',
         operator: FilterOperator.RelationManyMany,
         unfilteredLabel: 'All',
-        fetchSelects: createFetchRelated(
+        fetchSelects: createFetchOwners(
           'dataset',
-          'owners',
           createErrorHandler(errMsg =>
             t(
               'An error occurred while fetching dataset owner values: %s',
@@ -587,6 +591,7 @@ const DatasetList: FunctionComponent<DatasetListProps> = ({
           ),
           user,
         ),
+        optionFilterProps: OWNER_OPTION_FILTER_PROPS,
         paginate: true,
         dropdownStyle: { minWidth: WIDER_DROPDOWN_WIDTH },
       },

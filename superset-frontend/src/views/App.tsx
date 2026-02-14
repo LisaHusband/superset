@@ -17,7 +17,6 @@
  * under the License.
  */
 import { Suspense, useEffect } from 'react';
-import { hot } from 'react-hot-loader/root';
 import {
   BrowserRouter as Router,
   Switch,
@@ -25,7 +24,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { bindActionCreators } from 'redux';
-import { css } from '@superset-ui/core';
+import { css } from '@apache-superset/core/ui';
 import { Layout, Loading } from '@superset-ui/core/components';
 import { setupAGGridModules } from '@superset-ui/core/components/ThemedAgGridReact';
 import { ErrorBoundary } from 'src/components';
@@ -110,4 +109,4 @@ const App = () => (
   </Router>
 );
 
-export default hot(App);
+export default App;

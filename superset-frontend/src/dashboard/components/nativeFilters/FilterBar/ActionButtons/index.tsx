@@ -17,15 +17,15 @@
  * under the License.
  */
 import { useMemo } from 'react';
+import { t } from '@apache-superset/core';
 import {
-  css,
   DataMaskState,
   DataMaskStateWithId,
-  t,
   isDefined,
-  SupersetTheme,
-  styled,
+  ChartCustomization,
+  ChartCustomizationDivider,
 } from '@superset-ui/core';
+import { css, SupersetTheme, styled } from '@apache-superset/core/ui';
 import { Button } from '@superset-ui/core/components';
 import { OPEN_FILTER_BAR_WIDTH } from 'src/dashboard/constants';
 import tinycolor from 'tinycolor2';
@@ -38,6 +38,7 @@ interface ActionButtonsProps {
   onClearAll: () => void;
   dataMaskSelected: DataMaskState;
   dataMaskApplied: DataMaskStateWithId;
+  chartCustomizationItems?: (ChartCustomization | ChartCustomizationDivider)[];
   isApplyDisabled: boolean;
   filterBarOrientation?: FilterBarOrientation;
 }
@@ -106,17 +107,35 @@ const ActionButtons = ({
   dataMaskSelected,
   isApplyDisabled,
   filterBarOrientation = FilterBarOrientation.Vertical,
+  chartCustomizationItems,
 }: ActionButtonsProps) => {
-  const isClearAllEnabled = useMemo(
-    () =>
-      Object.values(dataMaskApplied).some(
-        filter =>
-          isDefined(dataMaskSelected[filter.id]?.filterState?.value) ||
-          (!dataMaskSelected[filter.id] &&
-            isDefined(filter.filterState?.value)),
-      ),
-    [dataMaskApplied, dataMaskSelected],
-  );
+  const isClearAllEnabled = useMemo(() => {
+    const hasSelectedChanges = Object.entries(dataMaskSelected).some(
+      ([, mask]) => {
+        const hasValue = isDefined(mask?.filterState?.value);
+        const hasGroupBy = isDefined(mask?.ownState?.column);
+        return hasValue || hasGroupBy;
+      },
+    );
+
+    const hasAppliedChanges = Object.entries(dataMaskApplied).some(
+      ([, mask]) => {
+        const hasValue = isDefined(mask?.filterState?.value);
+        const hasGroupBy = isDefined(mask?.ownState?.column);
+        return hasValue || hasGroupBy;
+      },
+    );
+
+    const hasChartCustomizations = chartCustomizationItems?.some(item => {
+      if (item.removed) return false;
+      const mask = dataMaskApplied[item.id] || dataMaskSelected[item.id];
+      const hasValue = isDefined(mask?.filterState?.value);
+      const hasGroupBy = isDefined(mask?.ownState?.column);
+      return hasValue || hasGroupBy;
+    });
+
+    return hasSelectedChanges || hasAppliedChanges || hasChartCustomizations;
+  }, [dataMaskSelected, dataMaskApplied, chartCustomizationItems]);
   const isVertical = filterBarOrientation === FilterBarOrientation.Vertical;
 
   return (
@@ -138,7 +157,6 @@ const ActionButtons = ({
       <Button
         disabled={!isClearAllEnabled}
         buttonStyle="link"
-        buttonSize="small"
         className="filter-clear-all-button"
         onClick={onClearAll}
         {...getFilterBarTestId('clear-button')}

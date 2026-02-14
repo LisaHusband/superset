@@ -16,15 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t, SupersetTheme } from '@apache-superset/core';
 import {
   isFeatureEnabled,
   FeatureFlag,
   getChartMetadataRegistry,
   JsonResponse,
-  styled,
   SupersetClient,
-  t,
+  isMatrixifyEnabled,
 } from '@superset-ui/core';
+import { css, styled } from '@apache-superset/core/ui';
 import { useState, useMemo, useCallback } from 'react';
 import rison from 'rison';
 import { uniqBy } from 'lodash';
@@ -32,8 +33,10 @@ import { useSelector } from 'react-redux';
 import {
   createErrorHandler,
   createFetchRelated,
+  createFetchOwners,
   handleChartDelete,
 } from 'src/views/CRUD/utils';
+import { OWNER_OPTION_FILTER_PROPS } from 'src/features/owners/OwnerSelectLabel';
 import {
   useChartEditModal,
   useFavoriteStatus,
@@ -78,6 +81,7 @@ import { UserWithPermissionsAndRoles } from 'src/types/bootstrapTypes';
 import { findPermission } from 'src/utils/findPermission';
 import { QueryObjectColumns } from 'src/views/CRUD/types';
 import { WIDER_DROPDOWN_WIDTH } from 'src/components/ListView/utils';
+import { Tag } from 'src/components/Tag';
 
 const FlexRowContainer = styled.div`
   align-items: center;
@@ -241,12 +245,17 @@ function ChartList(props: ChartListProps) {
   const canDelete = hasPerm('can_write');
   const canExport = hasPerm('can_export');
   const initialSort = [{ id: 'changed_on_delta_humanized', desc: true }];
-  const handleBulkChartExport = (chartsToExport: Chart[]) => {
+  const handleBulkChartExport = async (chartsToExport: Chart[]) => {
     const ids = chartsToExport.map(({ id }) => id);
-    handleResourceExport('chart', ids, () => {
-      setPreparingExport(false);
-    });
     setPreparingExport(true);
+    try {
+      await handleResourceExport('chart', ids, () => {
+        setPreparingExport(false);
+      });
+    } catch (error) {
+      setPreparingExport(false);
+      addDangerToast(t('There was an issue exporting the selected charts'));
+    }
   };
 
   function handleBulkChartDelete(chartsToDelete: Chart[]) {
@@ -370,9 +379,22 @@ function ChartList(props: ChartListProps) {
       {
         Cell: ({
           row: {
-            original: { viz_type: vizType },
+            original: { viz_type: vizType, form_data: formData },
           },
-        }: any) => registry.get(vizType)?.name || vizType,
+        }: any) => (
+          <>
+            {registry.get(vizType)?.name || vizType}
+            {formData && isMatrixifyEnabled(formData) && (
+              <span
+                css={(theme: SupersetTheme) => css`
+                  margin-left: ${theme.marginXS}px;
+                `}
+              >
+                <Tag name="Matrixified" color="purple" />
+              </span>
+            )}
+          </>
+        ),
         Header: t('Type'),
         accessor: 'viz_type',
         id: 'viz_type',
@@ -656,9 +678,8 @@ function ChartList(props: ChartListProps) {
         input: 'select',
         operator: FilterOperator.RelationManyMany,
         unfilteredLabel: t('All'),
-        fetchSelects: createFetchRelated(
+        fetchSelects: createFetchOwners(
           'chart',
-          'owners',
           createErrorHandler(errMsg =>
             addDangerToast(
               t(
@@ -669,6 +690,7 @@ function ChartList(props: ChartListProps) {
           ),
           props.user,
         ),
+        optionFilterProps: OWNER_OPTION_FILTER_PROPS,
         paginate: true,
         dropdownStyle: { minWidth: WIDER_DROPDOWN_WIDTH },
       },

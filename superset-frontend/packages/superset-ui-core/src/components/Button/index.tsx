@@ -19,7 +19,7 @@
 import { Children, ReactElement, Fragment } from 'react';
 import cx from 'classnames';
 import { Button as AntdButton } from 'antd';
-import { useTheme } from '@superset-ui/core';
+import { useTheme } from '@apache-superset/core/ui';
 import { Tooltip } from '../Tooltip';
 import type {
   ButtonColorType,
@@ -126,7 +126,7 @@ export function Button(props: ButtonProps) {
         minWidth: cta ? theme.sizeUnit * 36 : undefined,
         minHeight: cta ? theme.sizeUnit * 8 : undefined,
         marginLeft: 0,
-        '& + .superset-button': {
+        '& + .superset-button:not(.ant-btn-compact-item)': {
           marginLeft: theme.sizeUnit * 2,
         },
         '& > span > :first-of-type': {

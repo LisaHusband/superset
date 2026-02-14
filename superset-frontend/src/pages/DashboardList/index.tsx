@@ -16,22 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t } from '@apache-superset/core';
 import {
   isFeatureEnabled,
   FeatureFlag,
-  styled,
   SupersetClient,
-  t,
 } from '@superset-ui/core';
+import { styled } from '@apache-superset/core/ui';
 import { useSelector } from 'react-redux';
 import { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import rison from 'rison';
 import {
   createFetchRelated,
+  createFetchOwners,
   createErrorHandler,
   handleDashboardDelete,
 } from 'src/views/CRUD/utils';
+import { OWNER_OPTION_FILTER_PROPS } from 'src/features/owners/OwnerSelectLabel';
 import { useListViewResource, useFavoriteStatus } from 'src/views/CRUD/hooks';
 import {
   CertifiedBadge,
@@ -274,12 +276,17 @@ function DashboardList(props: DashboardListProps) {
     );
   }
 
-  const handleBulkDashboardExport = (dashboardsToExport: Dashboard[]) => {
+  const handleBulkDashboardExport = async (dashboardsToExport: Dashboard[]) => {
     const ids = dashboardsToExport.map(({ id }) => id);
-    handleResourceExport('dashboard', ids, () => {
-      setPreparingExport(false);
-    });
     setPreparingExport(true);
+    try {
+      await handleResourceExport('dashboard', ids, () => {
+        setPreparingExport(false);
+      });
+    } catch (error) {
+      setPreparingExport(false);
+      addDangerToast(t('There was an issue exporting the selected dashboards'));
+    }
   };
 
   function handleBulkDashboardDelete(dashboardsToDelete: Dashboard[]) {
@@ -577,9 +584,8 @@ function DashboardList(props: DashboardListProps) {
         input: 'select',
         operator: FilterOperator.RelationManyMany,
         unfilteredLabel: t('All'),
-        fetchSelects: createFetchRelated(
+        fetchSelects: createFetchOwners(
           'dashboard',
-          'owners',
           createErrorHandler(errMsg =>
             addDangerToast(
               t(
@@ -590,6 +596,7 @@ function DashboardList(props: DashboardListProps) {
           ),
           props.user,
         ),
+        optionFilterProps: OWNER_OPTION_FILTER_PROPS,
         paginate: true,
         dropdownStyle: { minWidth: WIDER_DROPDOWN_WIDTH },
       },

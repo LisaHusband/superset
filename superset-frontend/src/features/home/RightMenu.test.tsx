@@ -32,7 +32,11 @@ jest.mock('react-redux', () => ({
   useSelector: jest.fn(),
 }));
 
-jest.mock('src/features/databases/DatabaseModal', () => () => <span />);
+jest.mock('src/features/databases/DatabaseModal', () => {
+  const DatabaseModal = () => <span />;
+  DatabaseModal.displayName = 'DatabaseModal';
+  return DatabaseModal;
+});
 
 const dropdownItems = [
   {
@@ -127,40 +131,49 @@ const createProps = (): RightMenuProps => ({
   },
 });
 
-const mockNonExamplesDB = [...new Array(2)].map((_, i) => ({
-  changed_by: {
-    first_name: `user`,
-    last_name: `${i}`,
-  },
-  database_name: `db ${i}`,
-  backend: 'postgresql',
-  allow_run_async: true,
-  allow_dml: false,
-  allow_file_upload: true,
-  expose_in_sqllab: false,
-  changed_on_delta_humanized: `${i} day(s) ago`,
-  changed_on: new Date().toISOString,
-  id: i,
-  engine_information: {
-    supports_file_upload: true,
-  },
-}));
+const mockNonExamplesDB = Array.from({ length: 2 })
+  .fill(undefined)
+  .map((_, i) => ({
+    changed_by: {
+      first_name: `user`,
+      last_name: `${i}`,
+    },
+    database_name: `db ${i}`,
+    backend: 'postgresql',
+    allow_run_async: true,
+    allow_dml: false,
+    allow_file_upload: true,
+    expose_in_sqllab: false,
+    changed_on_delta_humanized: `${i} day(s) ago`,
+    changed_on: new Date().toISOString,
+    id: i,
+    engine_information: {
+      supports_file_upload: true,
+    },
+  }));
 
 const useSelectorMock = jest.spyOn(reactRedux, 'useSelector');
+
+const getDatabaseWithFileFiterMockUrl =
+  'glob:*api/v1/database/?q=(filters:!((col:allow_file_upload,opr:upload_is_enabled,value:!t)))';
+const getDatabaseWithNameFilterMockUrl =
+  'glob:*api/v1/database/?q=(filters:!((col:database_name,opr:neq,value:examples)))';
 
 beforeEach(async () => {
   useSelectorMock.mockReset();
   fetchMock.get(
-    'glob:*api/v1/database/?q=(filters:!((col:allow_file_upload,opr:upload_is_enabled,value:!t)))',
+    getDatabaseWithFileFiterMockUrl,
     { result: [], count: 0 },
+    { name: getDatabaseWithFileFiterMockUrl },
   );
   fetchMock.get(
-    'glob:*api/v1/database/?q=(filters:!((col:database_name,opr:neq,value:examples)))',
+    getDatabaseWithNameFilterMockUrl,
     { result: [], count: 0 },
+    { name: getDatabaseWithNameFilterMockUrl },
   );
 });
 
-afterEach(() => fetchMock.restore());
+afterEach(() => fetchMock.clearHistory().removeRoutes());
 
 const resetUseSelectorMock = () => {
   useSelectorMock.mockReturnValueOnce({
@@ -199,6 +212,7 @@ test('renders', async () => {
   resetUseSelectorMock();
   const { container } = render(<RightMenu {...mockedProps} />, {
     useRedux: true,
+    useRouter: true,
     useQueryParams: true,
     useTheme: true,
   });
@@ -212,32 +226,29 @@ test('If user has permission to upload files AND connect DBs we query existing D
   resetUseSelectorMock();
   const { container } = render(<RightMenu {...mockedProps} />, {
     useRedux: true,
+    useRouter: true,
     useQueryParams: true,
     useTheme: true,
   });
   await waitFor(() => expect(container).toBeVisible());
-  const callsD = fetchMock.calls(/database\/\?q/);
+  const callsD = fetchMock.callHistory.calls(/database\/\?q/);
   expect(callsD).toHaveLength(2);
-  expect(callsD[0][0]).toMatchInlineSnapshot(
+  expect(callsD[0].url).toMatchInlineSnapshot(
     `"http://localhost/api/v1/database/?q=(filters:!((col:allow_file_upload,opr:upload_is_enabled,value:!t)))"`,
   );
-  expect(callsD[1][0]).toMatchInlineSnapshot(
+  expect(callsD[1].url).toMatchInlineSnapshot(
     `"http://localhost/api/v1/database/?q=(filters:!((col:database_name,opr:neq,value:examples)))"`,
   );
 });
 
 test('If only examples DB exist we must show the Connect Database option', async () => {
   const mockedProps = createProps();
-  fetchMock.get(
-    'glob:*api/v1/database/?q=(filters:!((col:allow_file_upload,opr:upload_is_enabled,value:!t)))',
-    { result: [...mockNonExamplesDB], count: 2 },
-    { overwriteRoutes: true },
-  );
-  fetchMock.get(
-    'glob:*api/v1/database/?q=(filters:!((col:database_name,opr:neq,value:examples)))',
-    { result: [], count: 0 },
-    { overwriteRoutes: true },
-  );
+  fetchMock.modifyRoute(getDatabaseWithFileFiterMockUrl, {
+    response: { result: [...mockNonExamplesDB], count: 2 },
+  });
+  fetchMock.modifyRoute(getDatabaseWithNameFilterMockUrl, {
+    response: { result: [], count: 0 },
+  });
   // Initial Load
   resetUseSelectorMock();
   // setAllowUploads called
@@ -251,25 +262,21 @@ test('If only examples DB exist we must show the Connect Database option', async
     useTheme: true,
   });
   const dropdown = screen.getByTestId('new-dropdown-icon');
-  userEvent.hover(dropdown);
+  await userEvent.hover(dropdown);
   const dataMenu = await screen.findByText(dropdownItems[0].label);
-  userEvent.hover(dataMenu);
+  await userEvent.hover(dataMenu);
   expect(await screen.findByText('Connect database')).toBeInTheDocument();
   expect(screen.queryByText('Create dataset')).not.toBeInTheDocument();
 });
 
 test('If more than just examples DB exist we must show the Create dataset option', async () => {
   const mockedProps = createProps();
-  fetchMock.get(
-    'glob:*api/v1/database/?q=(filters:!((col:allow_file_upload,opr:upload_is_enabled,value:!t)))',
-    { result: [...mockNonExamplesDB], count: 2 },
-    { overwriteRoutes: true },
-  );
-  fetchMock.get(
-    'glob:*api/v1/database/?q=(filters:!((col:database_name,opr:neq,value:examples)))',
-    { result: [...mockNonExamplesDB], count: 2 },
-    { overwriteRoutes: true },
-  );
+  fetchMock.modifyRoute(getDatabaseWithFileFiterMockUrl, {
+    response: { result: [...mockNonExamplesDB], count: 2 },
+  });
+  fetchMock.modifyRoute(getDatabaseWithNameFilterMockUrl, {
+    response: { result: [...mockNonExamplesDB], count: 2 },
+  });
   // Initial Load
   resetUseSelectorMock();
   // setAllowUploads called
@@ -283,9 +290,9 @@ test('If more than just examples DB exist we must show the Create dataset option
     useTheme: true,
   });
   const dropdown = screen.getByTestId('new-dropdown-icon');
-  userEvent.hover(dropdown);
+  await userEvent.hover(dropdown);
   const dataMenu = await screen.findByText(dropdownItems[0].label);
-  userEvent.hover(dataMenu);
+  await userEvent.hover(dataMenu);
   expect(await screen.findByText('Create dataset')).toBeInTheDocument();
   expect(screen.queryByText('Connect database')).not.toBeInTheDocument();
 });
@@ -295,12 +302,10 @@ test('If there is a DB with allow_file_upload set as True the option should be e
   fetchMock.get(
     'glob:*api/v1/database/?q=(filters:!((col:allow_file_upload,opr:upload_is_enabled,value:!t)))',
     { result: [...mockNonExamplesDB], count: 2 },
-    { overwriteRoutes: true },
   );
   fetchMock.get(
     'glob:*api/v1/database/?q=(filters:!((col:database_name,opr:neq,value:examples)))',
     { result: [...mockNonExamplesDB], count: 2 },
-    { overwriteRoutes: true },
   );
   // Initial load
   resetUseSelectorMock();
@@ -315,9 +320,9 @@ test('If there is a DB with allow_file_upload set as True the option should be e
     useTheme: true,
   });
   const dropdown = screen.getByTestId('new-dropdown-icon');
-  userEvent.hover(dropdown);
+  await userEvent.hover(dropdown);
   const dataMenu = await screen.findByText(dropdownItems[0].label);
-  userEvent.hover(dataMenu);
+  await userEvent.hover(dataMenu);
   const csvMenu = await screen.findByText('Upload CSV to database');
   expect(csvMenu).toBeInTheDocument();
   expect(
@@ -332,12 +337,10 @@ test('If there is NOT a DB with allow_file_upload set as True the option should 
   fetchMock.get(
     'glob:*api/v1/database/?q=(filters:!((col:allow_file_upload,opr:upload_is_enabled,value:!t)))',
     { result: [], count: 0 },
-    { overwriteRoutes: true },
   );
   fetchMock.get(
     'glob:*api/v1/database/?q=(filters:!((col:database_name,opr:neq,value:examples)))',
     { result: [...mockNonExamplesDB], count: 2 },
-    { overwriteRoutes: true },
   );
   // Initial load
   resetUseSelectorMock();
@@ -352,9 +355,9 @@ test('If there is NOT a DB with allow_file_upload set as True the option should 
     useTheme: true,
   });
   const dropdown = screen.getByTestId('new-dropdown-icon');
-  userEvent.hover(dropdown);
+  await userEvent.hover(dropdown);
   const dataMenu = await screen.findByText(dropdownItems[0].label);
-  userEvent.hover(dataMenu);
+  await userEvent.hover(dataMenu);
   const csvMenu = await screen.findByRole('menuitem', {
     name: 'Upload CSV to database',
   });
@@ -372,20 +375,21 @@ test('Logs out and clears local storage item redux', async () => {
     useTheme: true,
   });
 
-  // Set an item in local storage to test if it gets cleared
+  // Set items in local and session storage to test if they get cleared
   localStorage.setItem('redux', JSON.stringify({ test: 'test' }));
+  sessionStorage.setItem('login_attempted', 'true');
   expect(localStorage.getItem('redux')).not.toBeNull();
+  expect(sessionStorage.getItem('login_attempted')).not.toBeNull();
 
-  userEvent.hover(await screen.findByText(/Settings/i));
+  await userEvent.hover(await screen.findByText(/Settings/i));
 
   // Simulate user clicking the logout button
-  await waitFor(() => {
-    const logoutButton = screen.getByText('Logout');
-    userEvent.click(logoutButton);
-  });
+  const logoutButton = await screen.findByText('Logout');
+  await userEvent.click(logoutButton);
 
-  // Wait for local storage to be cleared
+  // Wait for local and session storage to be cleared
   await waitFor(() => {
     expect(localStorage.getItem('redux')).toBeNull();
+    expect(sessionStorage.getItem('login_attempted')).toBeNull();
   });
 });

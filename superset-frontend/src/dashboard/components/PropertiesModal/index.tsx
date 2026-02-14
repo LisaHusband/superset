@@ -21,25 +21,27 @@ import { omit } from 'lodash';
 import jsonStringify from 'json-stringify-pretty-compact';
 import {
   Form,
-  Modal,
   Collapse,
   CollapseLabelInModal,
-  JsonEditor,
 } from '@superset-ui/core/components';
 import { useJsonValidation } from '@superset-ui/core/components/AsyncAceEditor';
 import { type TagType } from 'src/components';
 import rison from 'rison';
+import { t } from '@apache-superset/core';
 import {
   ensureIsArray,
   isFeatureEnabled,
   FeatureFlag,
   getCategoricalSchemeRegistry,
   SupersetClient,
-  t,
   getClientErrorObject,
 } from '@superset-ui/core';
 
 import withToasts from 'src/components/MessageToasts/withToasts';
+import {
+  OWNER_TEXT_LABEL_PROP,
+  OWNER_EMAIL_PROP,
+} from 'src/features/owners/OwnerSelectLabel';
 import { fetchTags, OBJECT_TYPES } from 'src/features/tags/tags';
 import {
   applyColors,
@@ -81,6 +83,7 @@ type Owners = {
   full_name?: string;
   first_name?: string;
   last_name?: string;
+  email?: string;
 }[];
 type DashboardInfo = {
   id: number;
@@ -129,6 +132,7 @@ const PropertiesModal = ({
   const [customCss, setCustomCss] = useState('');
   const [refreshFrequency, setRefreshFrequency] = useState(0);
   const [selectedThemeId, setSelectedThemeId] = useState<number | null>(null);
+  const [showChartTimestamps, setShowChartTimestamps] = useState(false);
   const [themes, setThemes] = useState<
     Array<{
       id: number;
@@ -141,7 +145,11 @@ const PropertiesModal = ({
   const handleErrorResponse = async (response: Response) => {
     const { error, statusText, message } = await getClientErrorObject(response);
     let errorText = error || statusText || t('An error has occurred');
-    if (typeof message === 'object' && 'json_metadata' in message) {
+    if (
+      typeof message === 'object' &&
+      'json_metadata' in message &&
+      typeof (message as { json_metadata: unknown }).json_metadata === 'string'
+    ) {
       errorText = (message as { json_metadata: string }).json_metadata;
     } else if (typeof message === 'string') {
       errorText = message;
@@ -151,11 +159,7 @@ const PropertiesModal = ({
       }
     }
 
-    Modal.error({
-      title: t('Error'),
-      content: errorText,
-      okButtonProps: { danger: true, className: 'btn-danger' },
-    });
+    addDangerToast(String(errorText));
   };
 
   const handleDashboardData = useCallback(
@@ -197,10 +201,12 @@ const PropertiesModal = ({
         'shared_label_colors',
         'map_label_colors',
         'color_scheme_domain',
+        'show_chart_timestamps',
       ]);
 
       setJsonMetadata(metaDataCopy ? jsonStringify(metaDataCopy) : '');
       setRefreshFrequency(metadata?.refresh_frequency || 0);
+      setShowChartTimestamps(metadata?.show_chart_timestamps ?? false);
       originalDashboardMetadata.current = metadata;
     },
     [form],
@@ -239,10 +245,16 @@ const PropertiesModal = ({
     }
   };
 
-  const handleOnChangeOwners = (owners: { value: number; label: string }[]) => {
-    const parsedOwners: Owners = ensureIsArray(owners).map(o => ({
+  const handleOnChangeOwners = (
+    owners: { value: number; label: string }[],
+    options: Record<string, unknown>[],
+  ) => {
+    const parsedOwners: Owners = ensureIsArray(owners).map((o, i) => ({
       id: o.value,
-      full_name: o.label,
+      full_name:
+        (options?.[i]?.[OWNER_TEXT_LABEL_PROP] as string) ||
+        (typeof o.label === 'string' ? o.label : ''),
+      email: (options?.[i]?.[OWNER_EMAIL_PROP] as string) || '',
     }));
     setOwners(parsedOwners);
   };
@@ -267,11 +279,7 @@ const PropertiesModal = ({
 
     // only fire if the color_scheme is present and invalid
     if (colorScheme && !colorChoices.includes(colorScheme)) {
-      Modal.error({
-        title: t('Error'),
-        content: t('A valid color scheme is required'),
-        okButtonProps: { danger: true, className: 'btn-danger' },
-      });
+      addDangerToast(t('A valid color scheme is required'));
       onHide();
       throw new Error('A valid color scheme is required');
     }
@@ -329,11 +337,13 @@ const PropertiesModal = ({
         : false;
     const jsonMetadataObj = getJsonMetadata();
     jsonMetadataObj.refresh_frequency = refreshFrequency;
+    jsonMetadataObj.show_chart_timestamps = Boolean(showChartTimestamps);
     const customLabelColors = jsonMetadataObj.label_colors || {};
     const updatedDashboardMetadata = {
       ...originalDashboardMetadata.current,
       label_colors: customLabelColors,
       color_scheme: updatedColorScheme,
+      show_chart_timestamps: showChartTimestamps,
     };
 
     originalDashboardMetadata.current = updatedDashboardMetadata;
@@ -450,8 +460,6 @@ const PropertiesModal = ({
           );
         });
     }
-
-    JsonEditor.preload();
   }, [
     currentDashboardInfo,
     fetchDashboardDetails,
@@ -595,20 +603,28 @@ const PropertiesModal = ({
     sections: modalSections,
   });
 
-  // Validate basic section when title changes
-  useEffect(() => {
-    validateSection('basic');
-  }, [dashboardTitle, validateSection]);
+  const isDataReady = !isLoading && dashboardInfo;
 
-  // Validate advanced section when JSON changes
+  // Validate basic section when title changes or data loads
   useEffect(() => {
-    validateSection('advanced');
-  }, [jsonMetadata, validateSection]);
+    if (isDataReady) {
+      validateSection('basic');
+    }
+  }, [dashboardTitle, validateSection, isDataReady]);
 
-  // Validate refresh section when refresh frequency changes
+  // Validate advanced section when JSON changes or data loads
   useEffect(() => {
-    validateSection('refresh');
-  }, [refreshFrequency, validateSection]);
+    if (isDataReady) {
+      validateSection('advanced');
+    }
+  }, [jsonMetadata, validateSection, isDataReady]);
+
+  // Validate refresh section when frequency changes or data loads
+  useEffect(() => {
+    if (isDataReady) {
+      validateSection('refresh');
+    }
+  }, [refreshFrequency, validateSection, isDataReady]);
 
   return (
     <StandardModal
@@ -639,7 +655,9 @@ const PropertiesModal = ({
         onFinish={onFinish}
         onFieldsChange={() => {
           // Re-validate sections when form fields change
-          setTimeout(() => validateSection('basic'), 100);
+          if (isDataReady) {
+            validateSection('basic');
+          }
         }}
         data-test="dashboard-edit-properties-form"
         layout="vertical"
@@ -710,9 +728,11 @@ const PropertiesModal = ({
                   colorScheme={colorScheme}
                   customCss={customCss}
                   hasCustomLabelsColor={hasCustomLabelsColor}
+                  showChartTimestamps={showChartTimestamps}
                   onThemeChange={handleThemeChange}
                   onColorSchemeChange={onColorSchemeChange}
                   onCustomCssChange={setCustomCss}
+                  onShowChartTimestampsChange={setShowChartTimestamps}
                   addDangerToast={addDangerToast}
                 />
               ),

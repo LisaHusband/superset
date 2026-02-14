@@ -16,20 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { css, styled, useTheme } from '@superset-ui/core';
+import type { FC } from 'react';
+import { css, styled, useTheme } from '@apache-superset/core/ui';
 
 // eslint-disable-next-line no-restricted-imports
 import { Tabs as AntdTabs, TabsProps as AntdTabsProps } from 'antd';
 import { Icons } from '@superset-ui/core/components/Icons';
+import type { SerializedStyles } from '@emotion/react';
 
 export interface TabsProps extends AntdTabsProps {
   allowOverflow?: boolean;
+  fullHeight?: boolean;
+  contentStyle?: SerializedStyles;
 }
 
 const StyledTabs = ({
   animated = false,
   allowOverflow = true,
+  fullHeight = false,
   tabBarStyle,
+  contentStyle,
   ...props
 }: TabsProps) => {
   const theme = useTheme();
@@ -43,9 +49,18 @@ const StyledTabs = ({
       tabBarStyle={mergedStyle}
       css={theme => css`
         overflow: ${allowOverflow ? 'visible' : 'hidden'};
+        ${fullHeight && 'height: 100%;'}
 
         .ant-tabs-content-holder {
           overflow: ${allowOverflow ? 'visible' : 'auto'};
+          ${fullHeight && 'height: 100%;'}
+        }
+        .ant-tabs-content {
+          ${fullHeight && 'height: 100%;'}
+        }
+        .ant-tabs-tabpane {
+          ${fullHeight && 'height: 100%;'}
+          ${contentStyle}
         }
         .ant-tabs-tab {
           flex: 1 1 auto;
@@ -85,9 +100,10 @@ const Tabs = Object.assign(StyledTabs, {
 });
 
 const StyledEditableTabs = styled(StyledTabs)`
-  ${({ theme }) => `
+  ${({ theme, contentStyle }) => `
     .ant-tabs-content-holder {
       background: ${theme.colorBgContainer};
+      ${contentStyle}
     }
 
     & > .ant-tabs-nav {
@@ -146,7 +162,9 @@ export const StyledLineEditableTabs = styled(EditableTabs)`
   }
 `;
 
-export const LineEditableTabs = Object.assign(StyledLineEditableTabs, {
+export const LineEditableTabs: FC<TabsProps> & {
+  TabPane: typeof StyledTabPane;
+} = Object.assign(StyledLineEditableTabs, {
   TabPane: StyledTabPane,
 });
 

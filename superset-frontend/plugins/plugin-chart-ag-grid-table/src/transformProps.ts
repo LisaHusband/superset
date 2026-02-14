@@ -17,6 +17,7 @@
  * under the License.
  */
 import memoizeOne from 'memoize-one';
+import { t } from '@apache-superset/core';
 import {
   ComparisonType,
   Currency,
@@ -24,24 +25,22 @@ import {
   DataRecord,
   ensureIsArray,
   extractTimegrain,
-  FeatureFlag,
   getMetricLabel,
   getNumberFormatter,
   getTimeFormatter,
   getTimeFormatterForGranularity,
-  isFeatureEnabled,
   NumberFormats,
   QueryMode,
   SMART_DATE_ID,
-  t,
   TimeFormats,
   TimeFormatter,
 } from '@superset-ui/core';
 import { GenericDataType } from '@apache-superset/core/api/core';
-import { isEmpty, isEqual } from 'lodash';
+import { isEmpty, isEqual, merge } from 'lodash';
 import {
   ConditionalFormattingConfig,
   getColorFormatters,
+  ColorSchemeEnum,
 } from '@superset-ui/chart-controls';
 import isEqualColumns from './utils/isEqualColumns';
 import DateWithFormatter from './utils/DateWithFormatter';
@@ -50,7 +49,6 @@ import {
   TableChartProps,
   AgGridTableChartTransformedProps,
   TableColumnConfig,
-  ColorSchemeEnum,
   BasicColorFormatterType,
 } from './types';
 
@@ -73,6 +71,23 @@ function isPositiveNumber(value: string | number | null | undefined) {
     num > 0
   );
 }
+
+const calculateDifferences = (
+  originalValue: number,
+  comparisonValue: number,
+) => {
+  const valueDifference = originalValue - comparisonValue;
+  let percentDifferenceNum;
+  if (!originalValue && !comparisonValue) {
+    percentDifferenceNum = 0;
+  } else if (!originalValue || !comparisonValue) {
+    percentDifferenceNum = originalValue ? 1 : -1;
+  } else {
+    percentDifferenceNum =
+      (originalValue - comparisonValue) / Math.abs(comparisonValue);
+  }
+  return { valueDifference, percentDifferenceNum };
+};
 
 const processComparisonTotals = (
   comparisonSuffix: string,
@@ -147,23 +162,6 @@ const getComparisonColFormatter = (
       : getNumberFormatter(numberFormat);
   }
   return formatter;
-};
-
-const calculateDifferences = (
-  originalValue: number,
-  comparisonValue: number,
-) => {
-  const valueDifference = originalValue - comparisonValue;
-  let percentDifferenceNum;
-  if (!originalValue && !comparisonValue) {
-    percentDifferenceNum = 0;
-  } else if (!originalValue || !comparisonValue) {
-    percentDifferenceNum = originalValue ? 1 : -1;
-  } else {
-    percentDifferenceNum =
-      (originalValue - comparisonValue) / Math.abs(comparisonValue);
-  }
-  return { valueDifference, percentDifferenceNum };
 };
 
 const processComparisonDataRecords = memoizeOne(
@@ -465,13 +463,23 @@ const transformProps = (
   const {
     height,
     width,
-    rawFormData: formData,
+    rawFormData: originalFormData,
     queriesData = [],
     ownState: serverPaginationData,
     filterState,
-    hooks: { setDataMask = () => {} },
+    hooks: { setDataMask = () => {}, onChartStateChange },
     emitCrossFilters,
+    theme,
   } = chartProps;
+
+  // Merge extra_form_data (dashboard filter overrides) into formData
+  // This ensures dashboard-level settings (like time_compare) override chart-level settings
+  // From PRs #33947 and #34014
+  const formData = merge(
+    {},
+    originalFormData,
+    originalFormData.extra_form_data,
+  );
 
   const {
     include_search: includeSearch = false,
@@ -493,6 +501,35 @@ const transformProps = (
   } = formData;
 
   const allowRearrangeColumns = true;
+
+  // Calculate time comparison settings early since they're used in multiple places
+  const isUsingTimeComparison =
+    !isEmpty(time_compare) &&
+    queryMode === QueryMode.Aggregate &&
+    comparison_type === ComparisonType.Values;
+
+  const nonCustomNorInheritShifts = ensureIsArray(formData.time_compare).filter(
+    (shift: string) => shift !== 'custom' && shift !== 'inherit',
+  );
+  const customOrInheritShifts = ensureIsArray(formData.time_compare).filter(
+    (shift: string) => shift === 'custom' || shift === 'inherit',
+  );
+
+  let timeOffsets: string[] = [];
+
+  if (isUsingTimeComparison && !isEmpty(nonCustomNorInheritShifts)) {
+    timeOffsets = nonCustomNorInheritShifts;
+  }
+
+  // Shifts for custom or inherit time comparison
+  if (isUsingTimeComparison && !isEmpty(customOrInheritShifts)) {
+    if (customOrInheritShifts.includes('custom')) {
+      timeOffsets = timeOffsets.concat([formData.start_date_offset]);
+    }
+    if (customOrInheritShifts.includes('inherit')) {
+      timeOffsets = timeOffsets.concat(['inherit']);
+    }
+  }
 
   const calculateBasicStyle = (
     percentDifferenceNum: number,
@@ -606,12 +643,6 @@ const transformProps = (
       : undefined;
   };
 
-  const isUsingTimeComparison =
-    !isEmpty(time_compare) &&
-    queryMode === QueryMode.Aggregate &&
-    comparison_type === ComparisonType.Values &&
-    isFeatureEnabled(FeatureFlag.TableV2TimeComparisonEnabled);
-
   let hasServerPageLengthChanged = false;
 
   const pageLengthFromMap = serverPageLengthMap.get(slice_id);
@@ -624,28 +655,6 @@ const transformProps = (
 
   const timeGrain = extractTimegrain(formData);
 
-  const nonCustomNorInheritShifts = ensureIsArray(formData.time_compare).filter(
-    (shift: string) => shift !== 'custom' && shift !== 'inherit',
-  );
-  const customOrInheritShifts = ensureIsArray(formData.time_compare).filter(
-    (shift: string) => shift === 'custom' || shift === 'inherit',
-  );
-
-  let timeOffsets: string[] = [];
-
-  if (isUsingTimeComparison && !isEmpty(nonCustomNorInheritShifts)) {
-    timeOffsets = nonCustomNorInheritShifts;
-  }
-
-  // Shifts for custom or inherit time comparison
-  if (isUsingTimeComparison && !isEmpty(customOrInheritShifts)) {
-    if (customOrInheritShifts.includes('custom')) {
-      timeOffsets = timeOffsets.concat([formData.start_date_offset]);
-    }
-    if (customOrInheritShifts.includes('inherit')) {
-      timeOffsets = timeOffsets.concat(['inherit']);
-    }
-  }
   const comparisonSuffix = isUsingTimeComparison
     ? ensureIsArray(timeOffsets)[0]
     : '';
@@ -685,7 +694,7 @@ const transformProps = (
   const basicColorFormatters =
     comparisonColorEnabled && getBasicColorFormatter(baseQuery?.data, columns);
   const columnColorFormatters =
-    getColorFormatters(conditionalFormatting, passedData) ?? [];
+    getColorFormatters(conditionalFormatting, passedData, theme) ?? [];
 
   const basicColorColumnFormatters = getBasicColorFormatterForColumn(
     baseQuery?.data,
@@ -734,6 +743,8 @@ const transformProps = (
     basicColorColumnFormatters,
     basicColorFormatters,
     formData,
+    chartState: serverPaginationData?.chartState,
+    onChartStateChange,
   };
 };
 

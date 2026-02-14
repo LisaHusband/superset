@@ -33,6 +33,7 @@ from superset.commands.dataset.exceptions import (
     DatasetColumnNotFoundValidationError,
     DatasetColumnsDuplicateValidationError,
     DatasetColumnsExistsValidationError,
+    DatasetDataAccessIsNotAllowed,
     DatasetExistsValidationError,
     DatasetForbiddenError,
     DatasetInvalidError,
@@ -46,7 +47,7 @@ from superset.commands.dataset.exceptions import (
 from superset.connectors.sqla.models import SqlaTable
 from superset.daos.dataset import DatasetDAO
 from superset.datasets.schemas import FolderSchema
-from superset.exceptions import SupersetSecurityException
+from superset.exceptions import SupersetParseError, SupersetSecurityException
 from superset.models.core import Database
 from superset.sql.parse import Table
 from superset.utils.decorators import on_error, transaction
@@ -166,6 +167,38 @@ class UpdateDatasetCommand(UpdateMixin, BaseCommand):
         ):
             exceptions.append(DatasetExistsValidationError(table))
 
+        self._validate_sql_access(db, catalog, schema, exceptions)
+
+    def _validate_sql_access(
+        self,
+        db: Database,
+        catalog: str | None,
+        schema: str | None,
+        exceptions: list[ValidationError],
+    ) -> None:
+        """Validate SQL query access if SQL is being updated."""
+        # we know we have a valid model
+        self._model = cast(SqlaTable, self._model)
+
+        sql = self._properties.get("sql")
+        if sql and sql != self._model.sql:
+            try:
+                security_manager.raise_for_access(
+                    database=db,
+                    sql=sql,
+                    catalog=catalog,
+                    schema=schema,
+                )
+            except SupersetSecurityException as ex:
+                exceptions.append(DatasetDataAccessIsNotAllowed(ex.error.message))
+            except SupersetParseError as ex:
+                exceptions.append(
+                    ValidationError(
+                        f"Invalid SQL: {ex.error.message}",
+                        field_name="sql",
+                    )
+                )
+
     def _validate_semantics(self, exceptions: list[ValidationError]) -> None:
         # we know we have a valid model
         self._model = cast(SqlaTable, self._model)
@@ -179,26 +212,25 @@ class UpdateDatasetCommand(UpdateMixin, BaseCommand):
             valid_uuids: set[UUID] = set()
             if metrics:
                 valid_uuids.update(
-                    UUID(metric["uuid"]) for metric in metrics if "uuid" in metric
+                    metric["uuid"] for metric in metrics if "uuid" in metric
                 )
             else:
                 valid_uuids.update(metric.uuid for metric in self._model.metrics)
 
             if columns:
                 valid_uuids.update(
-                    UUID(column["uuid"]) for column in columns if "uuid" in column
+                    column["uuid"] for column in columns if "uuid" in column
                 )
             else:
                 valid_uuids.update(column.uuid for column in self._model.columns)
 
+            schema = FolderSchema(many=True)
             try:
-                validate_folders(folders, valid_uuids)
+                loaded_folders = schema.load(folders)
+                validate_folders(loaded_folders, valid_uuids)
+                self._properties["folders"] = schema.dump(loaded_folders)
             except ValidationError as ex:
                 exceptions.append(ex)
-
-            # dump schema to convert UUID to string
-            schema = FolderSchema(many=True)
-            self._properties["folders"] = schema.dump(folders)
 
     def _validate_columns(
         self, columns: list[dict[str, Any]], exceptions: list[ValidationError]

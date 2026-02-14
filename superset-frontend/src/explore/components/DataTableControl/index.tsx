@@ -17,15 +17,9 @@
  * under the License.
  */
 import { useMemo, useState, useEffect, useRef, RefObject } from 'react';
-import {
-  css,
-  getTimeFormatter,
-  safeHtmlSpan,
-  styled,
-  t,
-  TimeFormats,
-  useTheme,
-} from '@superset-ui/core';
+import { t } from '@apache-superset/core';
+import { getTimeFormatter, safeHtmlSpan, TimeFormats } from '@superset-ui/core';
+import { css, styled, useTheme } from '@apache-superset/core/ui';
 import { GenericDataType } from '@apache-superset/core/api/core';
 import { Column } from 'react-table';
 import { debounce } from 'lodash';
@@ -38,7 +32,10 @@ import {
   Radio,
 } from '@superset-ui/core/components';
 import { CopyToClipboard } from 'src/components';
-import { prepareCopyToClipboardTabularData } from 'src/utils/common';
+import {
+  prepareCopyToClipboardTabularData,
+  TabularDataRow,
+} from 'src/utils/common';
 import { getTimeColumns, setTimeColumns } from './utils';
 
 export const CellNull = styled('span')`
@@ -62,7 +59,7 @@ export const CopyToClipboardButton = ({
   data,
   columns,
 }: {
-  data?: Record<string, any>;
+  data?: TabularDataRow[];
   columns?: string[];
 }) => (
   <CopyToClipboard
@@ -170,6 +167,7 @@ const DataTableTemporalHeaderCell = ({
   onTimeColumnChange,
   datasourceId,
   isOriginalTimeColumn,
+  displayLabel,
 }: {
   columnName: string;
   onTimeColumnChange: (
@@ -178,6 +176,7 @@ const DataTableTemporalHeaderCell = ({
   ) => void;
   datasourceId?: string;
   isOriginalTimeColumn: boolean;
+  displayLabel?: string;
 }) => {
   const theme = useTheme();
 
@@ -221,10 +220,10 @@ const DataTableTemporalHeaderCell = ({
           onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}
         />
       </Popover>
-      {columnName}
+      {displayLabel ?? columnName}
     </span>
   ) : (
-    <span>{columnName}</span>
+    <span>{displayLabel ?? columnName}</span>
   );
 };
 
@@ -264,6 +263,7 @@ export const useTableColumns = (
   isVisible?: boolean,
   moreConfigs?: { [key: string]: Partial<Column> },
   allowHTML?: boolean,
+  columnDisplayNames?: Record<string, string>,
 ) => {
   const [originalFormattedTimeColumns, setOriginalFormattedTimeColumns] =
     useState<string[]>(getTimeColumns(datasourceId));
@@ -308,6 +308,7 @@ export const useTableColumns = (
             .map((key, index) => {
               const colType = coltypes?.[index];
               const firstValue = data[0][key];
+              const headerLabel = columnDisplayNames?.[key] ?? key;
               const originalFormattedTimeColumnIndex =
                 colType === GenericDataType.Temporal
                   ? originalFormattedTimeColumns.indexOf(key)
@@ -326,9 +327,10 @@ export const useTableColumns = (
                       datasourceId={datasourceId}
                       onTimeColumnChange={onTimeColumnChange}
                       isOriginalTimeColumn={isOriginalTimeColumn}
+                      displayLabel={headerLabel}
                     />
                   ) : (
-                    key
+                    headerLabel
                   ),
                 Cell: ({ value }) => {
                   if (value === true) {
@@ -363,6 +365,7 @@ export const useTableColumns = (
       datasourceId,
       moreConfigs,
       originalFormattedTimeColumns,
+      columnDisplayNames,
     ],
   );
 };

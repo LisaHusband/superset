@@ -19,12 +19,12 @@
 import { useEffect, useState } from 'react';
 // eslint-disable-next-line no-restricted-syntax
 import * as supersetCore from '@apache-superset/core';
-import { logging } from '@superset-ui/core';
+import { FeatureFlag, isFeatureEnabled } from '@superset-ui/core';
 import {
   authentication,
   core,
   commands,
-  environment,
+  editors,
   extensions,
   sqlLab,
 } from 'src/core';
@@ -39,7 +39,7 @@ declare global {
       authentication: typeof authentication;
       core: typeof core;
       commands: typeof commands;
-      environment: typeof environment;
+      editors: typeof editors;
       extensions: typeof extensions;
       sqlLab: typeof sqlLab;
     };
@@ -69,20 +69,21 @@ const ExtensionsStartup = () => {
       authentication,
       core,
       commands,
-      environment,
+      editors,
       extensions,
       sqlLab,
     };
 
     // Initialize extensions
-    try {
-      ExtensionsManager.getInstance().initializeExtensions();
-      logging.info('Extensions initialized successfully.');
-    } catch (error) {
-      logging.error('Error setting up extensions:', error);
-    } finally {
-      setInitialized(true);
+    if (isFeatureEnabled(FeatureFlag.EnableExtensions)) {
+      try {
+        ExtensionsManager.getInstance().initializeExtensions();
+        supersetCore.logging.info('Extensions initialized successfully.');
+      } catch (error) {
+        supersetCore.logging.error('Error setting up extensions:', error);
+      }
     }
+    setInitialized(true);
   }, [initialized, userId]);
 
   return null;

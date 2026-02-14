@@ -26,15 +26,15 @@ import {
   useState,
 } from 'react';
 import { useSelector } from 'react-redux';
+import { t } from '@apache-superset/core';
 import {
   BinaryQueryObjectFilterClause,
-  css,
+  DatasourceType,
   ensureIsArray,
   JsonObject,
   QueryFormData,
-  t,
-  useTheme,
 } from '@superset-ui/core';
+import { css, useTheme } from '@apache-superset/core/ui';
 import { GenericDataType } from '@apache-superset/core/api/core';
 import { useResizeDetector } from 'react-resize-detector';
 import BooleanCell from '@superset-ui/core/components/Table/cell-renderers/BooleanCell';
@@ -238,8 +238,8 @@ export default function DrillDetailPane({
       const jsonPayload = getDrillPayload(formData, filters) ?? {};
       const cachePageLimit = Math.ceil(SAMPLES_ROW_LIMIT / PAGE_SIZE);
       getDatasourceSamples(
-        datasourceType,
-        datasourceId,
+        datasourceType as DatasourceType,
+        Number(datasourceId),
         false,
         jsonPayload,
         PAGE_SIZE,
